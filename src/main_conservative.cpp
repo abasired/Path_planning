@@ -33,7 +33,6 @@ int main() {
   double max_s = 6945.554;
   int lane = 1;
   double ref_vel = 0;
-  double Accelaration = 0;
   double target_vel = 25;
  
   std::ifstream in_map_(map_file_.c_str(), std::ifstream::in);
@@ -61,7 +60,7 @@ int main() {
   
   
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-               &map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel, &target_vel, &Accelaration]
+               &map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel, &target_vel]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -113,11 +112,9 @@ int main() {
           double s_diff;
           
           bool too_close = false;
-          bool lane_change_right_gap = false;
-          bool lane_change_left_gap = false;
-          vector<double> cost_KL;
-          vector<double> cost_LCR;
-          vector<double> cost_LCL;
+          bool lane_change_right_gap = true;
+          bool lane_change_left_gap = true;
+          
            
           if(prev_size > 0)
           {
@@ -125,7 +122,7 @@ int main() {
           }
          
           std::ofstream myfile("lane_info.txt", std::ios_base::app | std::ios_base::out);
-          //myfile << "car values" << "\t" << car_s << "\t"<< ref_vel/2.24 << "\t"<< car_d << "\t"<< "current_lane" <<"\t"<< lane << "\t"<< vel_ratio <<"\t" << prev_size <<"\n";
+          myfile << "car values" << "\t" << car_s << "\t"<< ref_vel/2.24 << "\t"<< car_d << "\t"<< "current_lane" <<"\t"<< lane << "\t"<< vel_ratio <<"\t" << prev_size <<"\n";
           /*
           Pericive the surrounding with respect to every car in sensor fusion output and compute the cost for every action.
           */
@@ -152,22 +149,22 @@ int main() {
                 too_close = too_close || (check_car_s > car_s && check_car_s - car_s < 30);
                 //cost_KL.push_back(((target_vel - ref_vel) + (target_vel - check_speed))/target_vel);
                 }
-              //myfile << "ngbr lane car values" << "\t"<< check_car_s << "\t"<< check_speed << "\t"<< d <<"\t" <<  "too_close" <<"\t"<< too_close <<"\t" << s_diff <<"\n";
+              myfile << "ngbr lane car values" << "\t"<< check_car_s << "\t"<< check_speed << "\t"<< d <<"\t" <<  "too_close" <<"\t"<< too_close <<"\t" << s_diff <<"\n";
 
               
             if (current_car_lane == lane - 1 ){
-                lane_change_left_gap = lane_change_left_gap || (check_car_s - car_s > -20 && check_car_s - car_s < 30) ;
+                lane_change_left_gap = lane_change_left_gap && pow(vel_ratio, s_diff) > 1 && abs(s_diff) > 30 ;
                 //cost_LCL.push_back(((target_vel - ref_vel) + (target_vel - check_speed))/target_vel);
                 } 
               
-               //myfile << "ngbr lane car values" << "\t"<< check_car_s << "\t"<< check_speed << "\t"<< d <<"\t" <<  "lane_change_left_gap" <<"\t"<< lane_change_left_gap <<"\t" << s_diff <<"\n";
+               myfile << "ngbr lane car values" << "\t"<< check_car_s << "\t"<< check_speed << "\t"<< d <<"\t" <<  "lane_change_left_gap" <<"\t"<< lane_change_left_gap <<"\t" << s_diff <<"\n";
              
              
             if (current_car_lane == lane + 1){
-              lane_change_right_gap = lane_change_right_gap || (check_car_s - car_s > -20 && check_car_s - car_s < 30);
+              lane_change_right_gap = lane_change_right_gap && pow(vel_ratio, s_diff) > 1 && abs(s_diff) > 30;
               }
               
-              //myfile << "ngbr lane car values" << "\t"<< check_car_s << "\t"<< check_speed << "\t"<< d <<"\t" <<  "lane_change_right_gap" <<"\t"<< lane_change_right_gap <<"\t" << s_diff <<"\n";
+              myfile << "ngbr lane car values" << "\t"<< check_car_s << "\t"<< check_speed << "\t"<< d <<"\t" <<  "lane_change_right_gap" <<"\t"<< lane_change_right_gap <<"\t" << s_diff <<"\n";
          
           }
           
@@ -175,25 +172,22 @@ int main() {
           If there is slow moving vehicle in the lane try to change lane. Initially perform lane change check. 
           Then set the flag for respective lange change. Udate the lane information for lane change trajectory generation.
           */
-          Accelaration = 0;
             if(too_close)
             {
               // make decision based on the flags set.
-              if(!(lane_change_left_gap) && lane > 0 ){
+              if((lane_change_left_gap) && lane > 0 ){
                 lane = lane - 1;              
-              }else if(!(lane_change_right_gap) && lane < 2 ){
+              }else if(lane_change_right_gap && lane < 2 ){
                 lane = lane + 1;
-              }else {
-                if (ref_vel > check_speed){
+              }else if (ref_vel > check_speed){
                 ref_vel -= 0.224;
-              } else {
-                 ref_vel = check_speed;
-                }
+              }else {
+                ref_vel = check_speed;
               }
             }
-            else if (ref_vel < 49.50 )
-            {
-              Accelaration += 0.224;
+            else if (ref_vel < 49.50 - 3*0.224)
+            { 
+              ref_vel += 3*0.224;
             }
 
                myfile.close();            
@@ -292,20 +286,11 @@ int main() {
           double target_x = 30;
           double target_y = s(target_x);
           double target_dist = sqrt(target_x * target_x + target_y*target_y);
-          double N = target_dist/(0.02*(ref_vel/2.24));
+          double N= target_dist/(0.02*(ref_vel/2.24));
           double x_add_on = 0;
           
           for (int i = 1; i < 50 - previous_path_x.size(); i++) {
             
-            ref_vel += Accelaration;
-            if (ref_vel > 49.5){
-              ref_vel = 49;
-            }else if (ref_vel == 0){
-              ref_vel = Accelaration;
-            }
-            
-              
-            N= target_dist/(0.02*(ref_vel/2.24));
             double x_point = x_add_on + (target_x) / N;
             double y_point = s(x_point);
 
@@ -321,7 +306,7 @@ int main() {
             y_point += ref_y;
             
             next_x_vals.push_back(x_point);
-            next_y_vals.push_back(y_point);
+              next_y_vals.push_back(y_point);
           }          
 
           msgJson["next_x"] = next_x_vals;

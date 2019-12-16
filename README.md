@@ -65,7 +65,7 @@ the path has processed since last time.
 
 2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
 
-## Tips
+## Project details
 
 A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
 
@@ -92,54 +92,28 @@ A really helpful resource for doing this project and creating smooth trajectorie
     git checkout e94b6e1
     ```
 
-## Editor Settings
+## Model
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+The funadametal idea of this project revolves around the idea of haivng a logic to generate waypoint to appropiately plan the path for a car to move. 
+The use of frenet coordinates really helps in this regard. Each waypoint is assoiciated with following information 
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+- lane
+- speed
+- accelaration
+- x coordinates and y coordinates
 
-## Code Style
+The notion of path planning is made easy by using state space representations of various steps in driving. In our algorithm we consider below states in state machine model.
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+1) look for cars close by
+2) plan lane change
+3) change lane
 
-## Project Instructions and Rubric
+The alogorithm is as follows:
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+- At periodic intervals, information regarding surrounding cars is obtained. This could be be from various other sensors. 
+- Based on the sensor information we decide on the possible state that car should remain. The path of the car is planned using waypoints that are separated by about 0.5m. We can choose the number of waypoints based on how often these are updated. In our model we have set 50 waypoints. 
+- To begin with, first we check if there are cars in front of our car are resulting in lowering our speed. In such case we look to transition our state to plan for lane change.
+- In this state, our car checks to see if we are safe to make lane changes and keep moving at max speed. If a decision is made that it is safe, we transition to change lane state. 
+- In this state, we update the new set of waypoints with new x-coord and y-coord with appropiate speed.
 
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
